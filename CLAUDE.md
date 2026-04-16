@@ -73,7 +73,7 @@ Production" by Adnan Khan.
 
 ## Phase Build Plan
 
-### Phase 1 -- Shell, theme, task submission [ ]
+### Phase 1 -- Shell, theme, task submission [DONE]
   PR: "feat: HTML shell, dark theme, task form"
 
 ### Phase 2 -- Pipeline dashboard and SSE [ ]
