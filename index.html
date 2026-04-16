@@ -431,10 +431,216 @@
       padding: 16px;
     }
 
-    /* Pipeline section placeholder (Phase 2) */
+    /* Pipeline section */
     .pipeline-section {
       display: none;
       margin-top: 20px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .task-id-copy {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      position: relative;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+
+    .task-id-copy:hover {
+      background: var(--bg);
+    }
+
+    .copy-tooltip {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green);
+      color: var(--white);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .copy-tooltip.show {
+      opacity: 1;
+    }
+
+    .badge-pulsing {
+      animation: badgePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes badgePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .elapsed-timer {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .pr-button {
+      display: none;
+      margin-left: 8px;
+    }
+
+    /* Skill pipeline grid */
+    .skill-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .skill-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+
+    /* Skill card states */
+    .skill-card.waiting {
+      border-color: var(--border);
+      background: var(--card);
+    }
+
+    .skill-card.running {
+      border-color: var(--teal);
+      border-width: 1.5px;
+      background: #0A1F1A;
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+    }
+
+    .skill-card.done {
+      border-color: var(--green);
+      background: #0A1F12;
+    }
+
+    .skill-card.failed {
+      border-color: var(--red);
+      background: #1F0A0A;
+    }
+
+    .skill-card.retrying {
+      border-color: var(--amber);
+      border-width: 1.5px;
+      background: #1F1500;
+    }
+
+    /* Skill indicator */
+    .skill-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .indicator-waiting {
+      border: 1.5px solid var(--dim);
+    }
+
+    .indicator-running {
+      border: 2px solid transparent;
+      border-top-color: var(--teal);
+      animation: spin 1s linear infinite;
+    }
+
+    .indicator-done {
+      background: var(--green);
+    }
+
+    .indicator-failed {
+      background: var(--red);
+    }
+
+    .indicator-retrying {
+      border: 2px solid transparent;
+      border-top-color: var(--amber);
+      animation: spin 1s linear infinite;
+    }
+
+    .indicator-icon {
+      width: 10px;
+      height: 10px;
+    }
+
+    /* Skill text */
+    .skill-label {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    .skill-card.running .skill-label,
+    .skill-card.done .skill-label,
+    .skill-card.failed .skill-label,
+    .skill-card.retrying .skill-label {
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .skill-sublabel {
+      font-size: 11px;
+      color: var(--dim);
+      min-height: 16px;
+      word-break: break-word;
+    }
+
+    .skill-card.running .skill-sublabel {
+      color: var(--teal);
+    }
+
+    .skill-card.done .skill-sublabel {
+      color: var(--green);
+    }
+
+    .skill-card.failed .skill-sublabel {
+      color: var(--red);
+    }
+
+    .skill-card.retrying .skill-sublabel {
+      color: var(--amber);
+    }
+
+    .skill-cost {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .retry-badge {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--amber);
+      background: rgba(245, 158, 11, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
     }
 
     /* Footer */
@@ -462,6 +668,18 @@
 
       .buttons-row {
         flex-wrap: wrap;
+      }
+
+      .skill-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .status-bar {
+        gap: 8px;
+      }
+
+      .elapsed-timer {
+        margin-left: 0;
       }
     }
 
@@ -545,8 +763,60 @@ Add due_date field to the Task model"
       <div class="submit-error" id="submit-error"></div>
     </div>
 
-    <!-- Pipeline section (Phase 2) -->
+    <!-- Pipeline Dashboard -->
     <div class="pipeline-section" id="pipeline-section">
+      <div class="card">
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span class="task-id-copy" id="task-id-display" role="button" tabindex="0" aria-label="Copy task ID">
+            <span class="copy-tooltip" id="copy-tooltip">Copied!</span>
+          </span>
+          <span class="badge badge-gray" id="task-status-badge">PENDING</span>
+          <span class="elapsed-timer" id="elapsed-timer"></span>
+          <div class="pr-button" id="pr-button-wrap">
+            <a class="btn btn-teal btn-small" id="pr-link" href="#" target="_blank" rel="noopener">View PR →</a>
+          </div>
+        </div>
+
+        <!-- Skill grid -->
+        <div class="skill-grid" id="skill-grid">
+          <div class="skill-card waiting" data-skill="issue_reader">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Reading issue</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="clarifier">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Analyzing clarity</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="codebase_explorer">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Exploring codebase</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="code_writer">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Writing code</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="test_writer">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Writing tests</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="test_runner">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Running tests</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+          <div class="skill-card waiting" data-skill="pr_creator">
+            <div class="skill-indicator indicator-waiting"></div>
+            <div class="skill-label">Creating PR</div>
+            <div class="skill-sublabel">Waiting...</div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -696,13 +966,9 @@ Add due_date field to the Task model"
         // Update connection status
         setConnectionStatus(true);
 
-        // Show pipeline section and scroll to it
-        pipelineSection.style.display = 'block';
+        // Start SSE stream and show pipeline
+        startSSEStream(currentTaskId);
         pipelineSection.scrollIntoView({ behavior: 'smooth' });
-
-        // Start SSE (Phase 2 will implement SSEManager)
-        // For now, just log
-        console.log('Task created:', currentTaskId);
 
       } catch (err) {
         submitError.textContent = `Error: ${err.message}`;
@@ -789,11 +1055,9 @@ Add due_date field to the Task model"
         row.addEventListener('click', () => {
           const taskId = row.dataset.taskId;
           currentTaskId = taskId;
-          setConnectionStatus(true);
-          pipelineSection.style.display = 'block';
+          startSSEStream(taskId);
           pipelineSection.scrollIntoView({ behavior: 'smooth' });
           closeRecentDropdown();
-          console.log('Loading task:', taskId);
         });
       });
     }
@@ -832,6 +1096,412 @@ Add due_date field to the Task model"
         closeRecentDropdown();
       }
     });
+
+    // ─── Pipeline DOM References ─────────────────────
+    const taskIdDisplay = document.getElementById('task-id-display');
+    const copyTooltip = document.getElementById('copy-tooltip');
+    const taskStatusBadge = document.getElementById('task-status-badge');
+    const elapsedTimer = document.getElementById('elapsed-timer');
+    const prButtonWrap = document.getElementById('pr-button-wrap');
+    const prLink = document.getElementById('pr-link');
+    const skillGrid = document.getElementById('skill-grid');
+
+    // ─── Skill name to display label map ─────────────
+    const SKILL_LABELS = {
+      issue_reader: 'Reading issue',
+      clarifier: 'Analyzing clarity',
+      codebase_explorer: 'Exploring codebase',
+      code_writer: 'Writing code',
+      test_writer: 'Writing tests',
+      test_runner: 'Running tests',
+      pr_creator: 'Creating PR',
+    };
+
+    // ─── Copy task ID ────────────────────────────────
+    taskIdDisplay.addEventListener('click', () => {
+      if (currentTaskId) {
+        navigator.clipboard.writeText(currentTaskId).then(() => {
+          copyTooltip.classList.add('show');
+          setTimeout(() => copyTooltip.classList.remove('show'), 1500);
+        });
+      }
+    });
+
+    taskIdDisplay.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        taskIdDisplay.click();
+      }
+    });
+
+    // ─── Timer ───────────────────────────────────────
+    let timerStart = null;
+    let timerPaused = 0;
+    let timerPauseStart = null;
+    let timerInterval = null;
+    let timerRafId = null;
+
+    function startTimer() {
+      timerStart = performance.now();
+      timerPaused = 0;
+      timerPauseStart = null;
+      updateTimerDisplay();
+    }
+
+    function pauseTimer() {
+      if (timerStart && !timerPauseStart) {
+        timerPauseStart = performance.now();
+        if (timerRafId) {
+          cancelAnimationFrame(timerRafId);
+          timerRafId = null;
+        }
+      }
+    }
+
+    function resumeTimer() {
+      if (timerPauseStart) {
+        timerPaused += performance.now() - timerPauseStart;
+        timerPauseStart = null;
+        updateTimerDisplay();
+      }
+    }
+
+    function stopTimer() {
+      if (timerRafId) {
+        cancelAnimationFrame(timerRafId);
+        timerRafId = null;
+      }
+    }
+
+    function getElapsedMs() {
+      if (!timerStart) return 0;
+      const now = timerPauseStart || performance.now();
+      return now - timerStart - timerPaused;
+    }
+
+    function formatElapsed(ms) {
+      if (ms < 60000) {
+        return `${(ms / 1000).toFixed(1)}s`;
+      }
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(1);
+      return `${minutes}m ${seconds}s`;
+    }
+
+    function updateTimerDisplay() {
+      elapsedTimer.textContent = formatElapsed(getElapsedMs());
+      timerRafId = requestAnimationFrame(updateTimerDisplay);
+    }
+
+    // ─── Skill Card Helpers ──────────────────────────
+    function getSkillCard(skillName) {
+      return skillGrid.querySelector(`[data-skill="${skillName}"]`);
+    }
+
+    function setSkillState(skillName, state, opts = {}) {
+      const card = getSkillCard(skillName);
+      if (!card) return;
+
+      // Reset classes
+      card.className = `skill-card ${state}`;
+
+      const indicator = card.querySelector('.skill-indicator');
+      const label = card.querySelector('.skill-label');
+      const sublabel = card.querySelector('.skill-sublabel');
+
+      // Reset indicator
+      indicator.className = `skill-indicator indicator-${state}`;
+      indicator.innerHTML = '';
+
+      switch (state) {
+        case 'waiting':
+          sublabel.textContent = 'Waiting...';
+          break;
+
+        case 'running':
+          sublabel.textContent = opts.message || 'Processing...';
+          break;
+
+        case 'done':
+          indicator.innerHTML = `<svg class="indicator-icon" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5.5L4 7.5L8 3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>`;
+          if (opts.elapsed_ms !== undefined) {
+            sublabel.textContent = `${opts.elapsed_ms}ms`;
+          }
+          // Show cost info
+          let costEl = card.querySelector('.skill-cost');
+          if (!costEl) {
+            costEl = document.createElement('div');
+            costEl.className = 'skill-cost';
+            card.appendChild(costEl);
+          }
+          if (opts.cost_usd !== undefined && opts.cost_usd > 0) {
+            const tokens = (opts.input_tokens || 0) + (opts.output_tokens || 0);
+            costEl.textContent = `$${opts.cost_usd.toFixed(4)} · ${tokens}t`;
+          } else {
+            costEl.textContent = '';
+          }
+          break;
+
+        case 'failed':
+          indicator.innerHTML = `<svg class="indicator-icon" viewBox="0 0 10 10" fill="none">
+            <path d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>`;
+          sublabel.textContent = opts.message || 'Failed';
+          if (opts.retry_count > 0) {
+            let retryEl = card.querySelector('.retry-badge');
+            if (!retryEl) {
+              retryEl = document.createElement('span');
+              retryEl.className = 'retry-badge';
+              card.appendChild(retryEl);
+            }
+            retryEl.textContent = `Retry ${opts.retry_count}/2`;
+          }
+          break;
+
+        case 'retrying':
+          sublabel.textContent = opts.message || `Retrying (${opts.retry_count || 1}/2)...`;
+          break;
+      }
+    }
+
+    function resetAllSkillCards() {
+      Object.keys(SKILL_LABELS).forEach(skill => {
+        setSkillState(skill, 'waiting');
+        // Remove any leftover cost/retry elements
+        const card = getSkillCard(skill);
+        if (card) {
+          const costEl = card.querySelector('.skill-cost');
+          if (costEl) costEl.remove();
+          const retryEl = card.querySelector('.retry-badge');
+          if (retryEl) retryEl.remove();
+        }
+      });
+    }
+
+    // ─── Task Status Badge ───────────────────────────
+    function setTaskStatus(status) {
+      const badgeClasses = {
+        PENDING: 'badge badge-gray',
+        RUNNING: 'badge badge-teal badge-pulsing',
+        AWAITING_CLARIFICATION: 'badge badge-amber badge-pulsing',
+        DONE: 'badge badge-green',
+        FAILED: 'badge badge-red',
+      };
+      taskStatusBadge.className = badgeClasses[status] || 'badge badge-gray';
+      taskStatusBadge.textContent = status;
+    }
+
+    // ─── SSE Manager ─────────────────────────────────
+    class SSEManager {
+      constructor(taskId, onEvent) {
+        this.taskId = taskId;
+        this.onEvent = onEvent;
+        this.es = null;
+        this.reconnectTimer = null;
+        this.lastEventTime = null;
+        this.pingTimer = null;
+      }
+
+      connect() {
+        const url = `${CONFIG.API_URL}/api/stream/${this.taskId}`;
+        this.es = new EventSource(url);
+
+        this.es.onmessage = (e) => {
+          this.lastEventTime = Date.now();
+          const event = JSON.parse(e.data);
+          if (event.type !== 'ping') {
+            this.onEvent(event);
+          }
+        };
+
+        this.es.onerror = () => {
+          this.es.close();
+          this.scheduleReconnect();
+        };
+
+        this.startPingWatchdog();
+      }
+
+      startPingWatchdog() {
+        clearInterval(this.pingTimer);
+        this.pingTimer = setInterval(() => {
+          if (this.lastEventTime &&
+              Date.now() - this.lastEventTime > CONFIG.PING_TIMEOUT_MS) {
+            this.es.close();
+            this.scheduleReconnect();
+          }
+        }, 5000);
+      }
+
+      scheduleReconnect() {
+        clearInterval(this.pingTimer);
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => {
+          this.connect();
+        }, CONFIG.SSE_RECONNECT_MS);
+      }
+
+      disconnect() {
+        if (this.es) this.es.close();
+        clearTimeout(this.reconnectTimer);
+        clearInterval(this.pingTimer);
+      }
+    }
+
+    // ─── Event Dispatcher ────────────────────────────
+    function handleEvent(event) {
+      switch (event.type) {
+        case 'task_start':             onTaskStart(event); break;
+        case 'clarification_needed':   onClarificationNeeded(event); break;
+        case 'clarification_received': onClarificationReceived(event); break;
+        case 'skill_start':            onSkillStart(event); break;
+        case 'skill_progress':         onSkillProgress(event); break;
+        case 'skill_done':             onSkillDone(event); break;
+        case 'skill_error':            onSkillError(event); break;
+        case 'log':                    onLog(event); break;
+        case 'task_done':              onTaskDone(event); break;
+        case 'benchmark_summary':      onBenchmarkSummary(event); break;
+        case 'task_failed':            onTaskFailed(event); break;
+      }
+    }
+
+    // ─── Event Handlers ──────────────────────────────
+    function onTaskStart(event) {
+      pipelineSection.style.display = 'block';
+      taskIdDisplay.childNodes[0].textContent = event.task_id || currentTaskId;
+      setTaskStatus('RUNNING');
+      startTimer();
+      resetAllSkillCards();
+      setConnectionStatus(true);
+    }
+
+    function onSkillStart(event) {
+      setSkillState(event.skill, 'running', { message: event.message });
+      addLog(`[${SKILL_LABELS[event.skill] || event.skill}] started`, 'info');
+    }
+
+    function onSkillProgress(event) {
+      setSkillState(event.skill, 'running', { message: event.message });
+    }
+
+    function onSkillDone(event) {
+      setSkillState(event.skill, 'done', {
+        elapsed_ms: event.elapsed_ms,
+        cost_usd: event.cost_usd,
+        input_tokens: event.input_tokens,
+        output_tokens: event.output_tokens,
+      });
+      addLog(`[${SKILL_LABELS[event.skill] || event.skill}] done (${event.elapsed_ms}ms)`, 'success');
+    }
+
+    function onSkillError(event) {
+      if (event.retry_count && event.retry_count > 0) {
+        setSkillState(event.skill, 'retrying', {
+          message: event.message,
+          retry_count: event.retry_count,
+        });
+        addLog(`[${SKILL_LABELS[event.skill] || event.skill}] retrying (${event.retry_count}/2)`, 'warn');
+      } else {
+        setSkillState(event.skill, 'failed', {
+          message: event.message,
+          retry_count: event.retry_count,
+        });
+        addLog(`[${SKILL_LABELS[event.skill] || event.skill}] failed: ${event.message}`, 'error');
+      }
+    }
+
+    function onClarificationNeeded(event) {
+      pauseTimer();
+      setTaskStatus('AWAITING_CLARIFICATION');
+      addLog('Agent needs clarification', 'warn');
+      // Phase 3 will implement the clarification panel
+    }
+
+    function onClarificationReceived(event) {
+      resumeTimer();
+      setTaskStatus('RUNNING');
+      addLog('Answers received — continuing', 'info');
+    }
+
+    function onLog(event) {
+      addLog(event.message, event.level || 'info');
+    }
+
+    function onTaskDone(event) {
+      stopTimer();
+      elapsedTimer.textContent = formatElapsed(event.elapsed_ms || getElapsedMs());
+      setTaskStatus('DONE');
+      setConnectionStatus(false);
+
+      // Show PR button
+      if (event.pr_url) {
+        prLink.href = event.pr_url;
+        prButtonWrap.style.display = 'block';
+      }
+
+      // Update localStorage
+      const tasks = getRecentTasks();
+      const idx = tasks.findIndex(t => t.task_id === currentTaskId);
+      if (idx !== -1) {
+        tasks[idx].status = 'DONE';
+        tasks[idx].pr_url = event.pr_url;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      }
+
+      addLog(`PR opened: ${event.pr_url}`, 'success');
+
+      // Confetti (Phase 3 will implement)
+      if (typeof runConfetti === 'function') {
+        runConfetti();
+      }
+    }
+
+    function onTaskFailed(event) {
+      stopTimer();
+      setTaskStatus('FAILED');
+      setConnectionStatus(false);
+      addLog(event.reason || 'Task failed', 'error');
+
+      // Update localStorage
+      const tasks = getRecentTasks();
+      const idx = tasks.findIndex(t => t.task_id === currentTaskId);
+      if (idx !== -1) {
+        tasks[idx].status = 'FAILED';
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      }
+    }
+
+    function onBenchmarkSummary(event) {
+      // Phase 3 will implement the benchmark table
+      addLog(`Benchmark: ${event.total_elapsed_human || formatElapsed(event.total_elapsed_ms)} total, $${event.total_cost_usd?.toFixed(4) || '0.00'}`, 'info');
+    }
+
+    // ─── Log helper (Phase 3 will add full log panel) ─
+    function addLog(message, level) {
+      const now = new Date();
+      const ts = now.toTimeString().substring(0, 8);
+      const prefix = level.toUpperCase().padEnd(7);
+      console.log(`[${ts}] ${prefix} ${message}`);
+    }
+
+    // ─── Wire up task submission to SSE ──────────────
+    function startSSEStream(taskId) {
+      if (sseManager) {
+        sseManager.disconnect();
+      }
+
+      // Show pipeline
+      pipelineSection.style.display = 'block';
+      taskIdDisplay.childNodes[0].textContent = taskId;
+      setTaskStatus('PENDING');
+      prButtonWrap.style.display = 'none';
+      resetAllSkillCards();
+
+      sseManager = new SSEManager(taskId, handleEvent);
+      sseManager.connect();
+    }
   </script>
 </body>
 </html>
