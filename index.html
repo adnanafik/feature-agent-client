@@ -273,6 +273,7 @@
       margin-top: 4px;
     }
 
+
     /* Error message */
     .field-error {
       font-size: 12px;
@@ -384,6 +385,29 @@
 
     .recent-task-pr:hover {
       text-decoration: underline;
+    }
+
+    .recent-task-delete {
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .recent-task-delete:hover {
+      color: var(--red);
+      border-color: var(--red);
     }
 
     /* Status badges */
@@ -836,6 +860,10 @@
     .clarification-submit {
       width: 100%;
       margin-top: 8px;
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      box-shadow: 0 -8px 12px -4px #1A1000;
     }
 
     .btn-amber {
@@ -1117,26 +1145,25 @@
       <textarea
         class="task-input"
         id="task-input"
-        placeholder="Paste a GitHub issue URL or describe the feature to implement...
+        placeholder="Describe the feature to implement...
 
 Examples:
-https://github.com/user/repo/issues/42
 Add pagination to the tasks endpoint
 Add due_date field to the Task model"
-        aria-label="Task description or GitHub issue URL"
+        aria-label="Task description"
       ></textarea>
-      <div class="field-error" id="task-error">Please enter a task description or GitHub issue URL</div>
+      <div class="field-error" id="task-error">Please enter a task description</div>
 
-      <label class="repo-label" for="repo-input">Target repository</label>
+      <label class="repo-label" for="url-input">GitHub repo URL</label>
       <input
         class="repo-input"
-        id="repo-input"
-        type="text"
-        placeholder="owner/repository-name"
-        aria-label="Target repository"
+        id="url-input"
+        type="url"
+        placeholder="https://github.com/owner/repo"
+        aria-label="GitHub repo URL"
       >
-      <div class="repo-example">e.g. adnankhan/projectflow-api</div>
-      <div class="field-error" id="repo-error">Repository must be in owner/repo format</div>
+      <div class="repo-example">e.g. https://github.com/adnankhan/projectflow-api</div>
+      <div class="field-error" id="url-error">Enter a valid GitHub repo URL</div>
 
       <div class="buttons-row">
         <button class="btn btn-teal" id="run-btn" disabled>
@@ -1255,31 +1282,49 @@ Add due_date field to the Task model"
   <!-- Footer -->
   <footer class="footer">
     Feature Agent · Built with Claude API · Course by Adnan Khan
+    · <span id="app-version" title="Bump this on UI changes to verify cache freshness"></span>
   </footer>
 
+  <!-- Local config (gitignored) — copy config.example.js to config.local.js -->
+  <script src="config.local.js"></script>
+
   <script>
+    document.title = 'SCRIPT RAN ✓';
+    console.log('[script] top reached');
+    // ─── Version ─────────────────────────────────────
+    // Bump this on every meaningful UI change so users can verify they're
+    // not viewing a stale cached version. Format: YYYY-MM-DD.N
+    const APP_VERSION = '2026-04-19.1';
+    console.log('[script] app version:', APP_VERSION);
     // ─── Configuration ───────────────────────────────
-    const CONFIG = {
+    const CONFIG = Object.assign({
       API_URL: 'http://localhost:8000',
+      GITHUB_TOKEN: '',
+      ANTHROPIC_API_KEY: '',
       MAX_LOG_LINES: 500,
       SSE_RECONNECT_MS: 3000,
       PING_TIMEOUT_MS: 30000,
       TIMER_UPDATE_MS: 100,
-    };
+    }, window.LOCAL_CONFIG || {});
+
+    // Render version in footer so cache staleness is easy to spot.
+    const versionEl = document.getElementById('app-version');
+    if (versionEl) versionEl.textContent = `v${APP_VERSION}`;
 
     // ─── State ───────────────────────────────────────
     let currentTaskId = null;
     let sseManager = null;
     let validationDebounceTimer = null;
 
+    console.log('[script] checkpoint 1: before DOM refs');
     // ─── DOM References ──────────────────────────────
     const taskInput = document.getElementById('task-input');
-    const repoInput = document.getElementById('repo-input');
+    const urlInput = document.getElementById('url-input');
     const runBtn = document.getElementById('run-btn');
     const runBtnText = document.getElementById('run-btn-text');
     const clearBtn = document.getElementById('clear-btn');
     const taskError = document.getElementById('task-error');
-    const repoError = document.getElementById('repo-error');
+    const urlError = document.getElementById('url-error');
     const submitError = document.getElementById('submit-error');
     const recentBtn = document.getElementById('recent-btn');
     const recentDropdown = document.getElementById('recent-dropdown');
@@ -1288,17 +1333,27 @@ Add due_date field to the Task model"
     const statusUrl = document.getElementById('status-url');
     const pipelineSection = document.getElementById('pipeline-section');
 
+    console.log('[script] checkpoint 2: DOM refs done', {
+      taskInput: !!taskInput,
+      urlInput: !!urlInput,
+      runBtn: !!runBtn,
+      clearBtn: !!clearBtn,
+    });
     // ─── Init ────────────────────────────────────────
     statusUrl.textContent = CONFIG.API_URL;
 
     // ─── Validation ──────────────────────────────────
-    const REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+    const REPO_URL_PATTERN = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
+
+    function normalizeRepoUrl(raw) {
+      return raw.trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+    }
 
     function validateInputs() {
       const hasTask = taskInput.value.trim().length > 0;
-      const hasRepo = repoInput.value.trim().length > 0;
-      const validRepo = !hasRepo || REPO_PATTERN.test(repoInput.value.trim());
-      runBtn.disabled = !(hasTask && hasRepo && validRepo);
+      const urlValue = normalizeRepoUrl(urlInput.value);
+      const validUrl = REPO_URL_PATTERN.test(urlValue);
+      runBtn.disabled = !(hasTask && validUrl);
     }
 
     function debounceValidate() {
@@ -1306,15 +1361,38 @@ Add due_date field to the Task model"
       validationDebounceTimer = setTimeout(validateInputs, 300);
     }
 
-    taskInput.addEventListener('input', debounceValidate);
-    repoInput.addEventListener('input', debounceValidate);
+    ['input', 'change', 'paste', 'blur'].forEach(ev => {
+      taskInput.addEventListener(ev, validateInputs);
+      urlInput.addEventListener(ev, validateInputs);
+    });
+
+    // Run once on load in case the browser restored form values
+    validateInputs();
 
     // ─── Clear ───────────────────────────────────────
     clearBtn.addEventListener('click', () => {
+      if (currentTaskId) {
+        fetch(`${CONFIG.API_URL}/api/tasks/${currentTaskId}`, { method: 'DELETE' })
+          .catch(() => {});
+      }
+      if (sseManager) {
+        sseManager.disconnect();
+        sseManager = null;
+      }
+      stopTimer();
+      resetAllSkillCards();
+      pipelineSection.style.display = 'none';
+      logContainer.innerHTML = '';
+      logSection.style.display = 'none';
+      benchmarkSection.style.display = 'none';
+      benchmarkTable.innerHTML = '';
+      statPills.innerHTML = '';
+      lastBenchmarkEvent = null;
+      currentTaskId = null;
       taskInput.value = '';
-      repoInput.value = '';
+      urlInput.value = '';
       taskError.classList.remove('visible');
-      repoError.classList.remove('visible');
+      urlError.classList.remove('visible');
       submitError.classList.remove('visible');
       validateInputs();
       taskInput.focus();
@@ -1322,17 +1400,19 @@ Add due_date field to the Task model"
 
     // ─── Submit ──────────────────────────────────────
     runBtn.addEventListener('click', () => {
-      submitTask();
+      console.log('[run-btn] click fired');
+      submitTask().catch((err) => console.error('[submitTask] threw', err));
     });
+    console.log('[init] listeners registered, script reached end of init block');
 
     async function submitTask() {
       // Clear previous errors
       taskError.classList.remove('visible');
-      repoError.classList.remove('visible');
+      urlError.classList.remove('visible');
       submitError.classList.remove('visible');
 
       const taskValue = taskInput.value.trim();
-      const repoValue = repoInput.value.trim();
+      const urlValue = normalizeRepoUrl(urlInput.value);
       let hasError = false;
 
       if (!taskValue) {
@@ -1342,17 +1422,23 @@ Add due_date field to the Task model"
         hasError = true;
       }
 
-      if (!repoValue) {
-        repoError.textContent = 'Please enter a target repository';
-        repoError.classList.add('visible');
-        repoInput.classList.add('shake');
-        setTimeout(() => repoInput.classList.remove('shake'), 300);
+      if (!urlValue) {
+        urlError.textContent = 'Please enter a GitHub repo URL';
+        urlError.classList.add('visible');
+        urlInput.classList.add('shake');
+        setTimeout(() => urlInput.classList.remove('shake'), 300);
         hasError = true;
-      } else if (!REPO_PATTERN.test(repoValue)) {
-        repoError.textContent = 'Repository must be in owner/repo format';
-        repoError.classList.add('visible');
-        repoInput.classList.add('shake');
-        setTimeout(() => repoInput.classList.remove('shake'), 300);
+      } else if (!REPO_URL_PATTERN.test(urlValue)) {
+        urlError.textContent = 'Enter a valid GitHub repo URL';
+        urlError.classList.add('visible');
+        urlInput.classList.add('shake');
+        setTimeout(() => urlInput.classList.remove('shake'), 300);
+        hasError = true;
+      }
+
+      if (!CONFIG.GITHUB_TOKEN || !CONFIG.ANTHROPIC_API_KEY) {
+        submitError.textContent = 'Error: Missing GITHUB_TOKEN or ANTHROPIC_API_KEY in config.local.js';
+        submitError.classList.add('visible');
         hasError = true;
       }
 
@@ -1362,13 +1448,23 @@ Add due_date field to the Task model"
       runBtn.disabled = true;
       runBtnText.innerHTML = '<span class="spinner"></span> Submitting...';
 
+      // Generate task ID
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
       // Build request body
-      const body = { target_repo: repoValue };
-      if (taskValue.startsWith('https://github.com/')) {
-        body.github_issue_url = taskValue;
-      } else {
-        body.task_description = taskValue;
-      }
+      const body = {
+        task_id: taskId,
+        task_description: taskValue,
+        provider: {
+          provider_type: 'anthropic',
+          github_token: CONFIG.GITHUB_TOKEN,
+          credentials: {
+            anthropic_api_key: CONFIG.ANTHROPIC_API_KEY,
+          },
+        },
+      };
+      const match = urlValue.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)\/?$/);
+      if (match) body.target_repo = `${match[1]}/${match[2]}`;
 
       try {
         const res = await fetch(`${CONFIG.API_URL}/api/tasks`, {
@@ -1422,24 +1518,34 @@ Add due_date field to the Task model"
       }
     }
 
-    // ─── Recent Tasks (localStorage) ─────────────────
-    const STORAGE_KEY = 'fa_recent_tasks';
-
-    function getRecentTasks() {
+    // ─── Recent Tasks (backend-backed) ───────────────
+    async function fetchAllTasks() {
       try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-      } catch {
+        const res = await fetch(`${CONFIG.API_URL}/api/tasks`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return data.tasks || [];
+      } catch (err) {
+        console.error('[tasks] fetch failed', err);
         return [];
       }
     }
 
-    function storeRecentTask(task) {
-      const tasks = getRecentTasks();
-      // Remove duplicate
-      const filtered = tasks.filter(t => t.task_id !== task.task_id);
-      filtered.unshift(task);
-      // Keep max 5
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered.slice(0, 5)));
+    async function deleteTaskById(taskId) {
+      try {
+        const res = await fetch(`${CONFIG.API_URL}/api/tasks/${taskId}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        console.error('[tasks] delete failed', err);
+        return null;
+      }
+    }
+
+    function storeRecentTask(_task) {
+      // No-op: task list is now served from the backend.
     }
 
     function timeAgo(dateStr) {
@@ -1460,14 +1566,21 @@ Add due_date field to the Task model"
         case 'AWAITING_CLARIFICATION': return 'badge-amber';
         case 'DONE': return 'badge-green';
         case 'FAILED': return 'badge-red';
+        case 'CANCELED': return 'badge-gray';
         default: return 'badge-gray';
       }
     }
 
-    function renderRecentDropdown() {
-      const tasks = getRecentTasks();
+    function taskSummary(t) {
+      const raw = t.task_description || t.github_issue_url || '';
+      return raw.length > 60 ? raw.substring(0, 60) + '…' : raw;
+    }
+
+    async function renderRecentDropdown() {
+      recentDropdown.innerHTML = '<div class="recent-empty">Loading…</div>';
+      const tasks = await fetchAllTasks();
       if (tasks.length === 0) {
-        recentDropdown.innerHTML = '<div class="recent-empty">No recent tasks</div>';
+        recentDropdown.innerHTML = '<div class="recent-empty">No tasks yet</div>';
         return;
       }
 
@@ -1475,20 +1588,39 @@ Add due_date field to the Task model"
         <div class="recent-task-row" role="menuitem" data-task-id="${t.task_id}">
           <span class="recent-task-id">${t.task_id.substring(0, 8)}</span>
           <span class="badge ${getStatusBadgeClass(t.status)}">${t.status}</span>
-          <span class="recent-task-summary">${escapeHtml(t.task_summary || '')}</span>
+          <span class="recent-task-summary">${escapeHtml(taskSummary(t))}</span>
           <span class="recent-task-time">${timeAgo(t.created_at)}</span>
-          ${t.pr_url ? `<a class="recent-task-pr" href="${escapeHtml(t.pr_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">PR →</a>` : ''}
+          ${t.result && t.result.pr_url ? `<a class="recent-task-pr" href="${escapeHtml(t.result.pr_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">PR →</a>` : ''}
+          <button class="recent-task-delete" data-task-id="${t.task_id}" data-status="${t.status}" aria-label="Delete or cancel task">×</button>
         </div>
       `).join('');
 
-      // Add click handlers
       recentDropdown.querySelectorAll('.recent-task-row').forEach(row => {
-        row.addEventListener('click', () => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.recent-task-delete') || e.target.closest('.recent-task-pr')) return;
           const taskId = row.dataset.taskId;
           currentTaskId = taskId;
           startSSEStream(taskId);
           pipelineSection.scrollIntoView({ behavior: 'smooth' });
           closeRecentDropdown();
+        });
+      });
+
+      recentDropdown.querySelectorAll('.recent-task-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const taskId = btn.dataset.taskId;
+          const isTerminal = ['DONE', 'FAILED', 'CANCELED'].includes(btn.dataset.status);
+          const prompt = isTerminal
+            ? `Delete task ${taskId.substring(0, 8)}? This removes its record and events.`
+            : `Cancel task ${taskId.substring(0, 8)}? It will stop at the next skill boundary.`;
+          if (!confirm(prompt)) return;
+          btn.disabled = true;
+          await deleteTaskById(taskId);
+          if (taskId === currentTaskId && isTerminal) {
+            currentTaskId = null;
+          }
+          renderRecentDropdown();
         });
       });
     }
@@ -1725,6 +1857,8 @@ Add due_date field to the Task model"
     }
 
     // ─── SSE Manager ─────────────────────────────────
+    const TERMINAL_EVENT_TYPES = new Set(['task_done', 'task_failed', 'task_canceled']);
+
     class SSEManager {
       constructor(taskId, onEvent) {
         this.taskId = taskId;
@@ -1733,23 +1867,36 @@ Add due_date field to the Task model"
         this.reconnectTimer = null;
         this.lastEventTime = null;
         this.pingTimer = null;
+        this.terminated = false;
+        this.seenEventIds = new Set();
       }
 
       connect() {
+        if (this.terminated) return;
         const url = `${CONFIG.API_URL}/api/stream/${this.taskId}`;
         this.es = new EventSource(url);
 
         this.es.onmessage = (e) => {
           this.lastEventTime = Date.now();
           const event = JSON.parse(e.data);
-          if (event.type !== 'ping') {
-            this.onEvent(event);
+          if (event.type === 'ping') return;
+
+          // Dedupe replayed events on reconnect
+          const key = event.event_id || `${event.type}:${event.timestamp || ''}:${event.skill || ''}:${event.message || ''}`;
+          if (this.seenEventIds.has(key)) return;
+          this.seenEventIds.add(key);
+
+          this.onEvent(event);
+
+          if (TERMINAL_EVENT_TYPES.has(event.type)) {
+            this.terminated = true;
+            this.disconnect();
           }
         };
 
         this.es.onerror = () => {
           this.es.close();
-          this.scheduleReconnect();
+          if (!this.terminated) this.scheduleReconnect();
         };
 
         this.startPingWatchdog();
@@ -1758,6 +1905,10 @@ Add due_date field to the Task model"
       startPingWatchdog() {
         clearInterval(this.pingTimer);
         this.pingTimer = setInterval(() => {
+          if (this.terminated) {
+            clearInterval(this.pingTimer);
+            return;
+          }
           if (this.lastEventTime &&
               Date.now() - this.lastEventTime > CONFIG.PING_TIMEOUT_MS) {
             this.es.close();
@@ -1767,6 +1918,7 @@ Add due_date field to the Task model"
       }
 
       scheduleReconnect() {
+        if (this.terminated) return;
         clearInterval(this.pingTimer);
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
@@ -1983,7 +2135,13 @@ Add due_date field to the Task model"
     function showClarificationPanel() {
       clarificationPanel.classList.add('open');
       clarificationVisible = true;
-      clarificationPanel.scrollIntoView({ behavior: 'smooth' });
+      // Wait for the panel to expand (CSS transition + render) before scrolling,
+      // so the scroll target reflects the panel's final position.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          clarificationPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
     }
 
     function hideClarificationPanel() {
@@ -2189,6 +2347,21 @@ Add due_date field to the Task model"
     const statPills = document.getElementById('stat-pills');
     let lastBenchmarkEvent = null;
 
+    function formatModelName(modelId) {
+      if (!modelId) return '';
+      if (modelId.includes('opus-4-7')) return 'Opus 4.7';
+      if (modelId.includes('opus-4-6')) return 'Opus 4.6';
+      if (modelId.includes('sonnet-4-6')) return 'Sonnet 4.6';
+      if (modelId.includes('sonnet-4-5')) return 'Sonnet 4.5';
+      if (modelId.includes('haiku-4-5')) return 'Haiku 4.5';
+      return modelId;
+    }
+
+    function formatModelsUsed(modelsUsed) {
+      if (!modelsUsed || modelsUsed.length === 0) return '--';
+      return [...new Set(modelsUsed.map(formatModelName))].join(', ');
+    }
+
     function renderBenchmarkTable(event) {
       benchmarkSection.style.display = 'block';
 
@@ -2198,6 +2371,7 @@ Add due_date field to the Task model"
             <th>Skill</th>
             <th>Time</th>
             <th>LLM</th>
+            <th>Model</th>
             <th>Tokens</th>
             <th>Cost</th>
           </tr>
@@ -2206,20 +2380,29 @@ Add due_date field to the Task model"
       `;
 
       event.skills.forEach(s => {
+        const skillKey = s.skill_name || s.skill;
+        const llmMs = s.llm_total_ms ?? s.llm_ms ?? 0;
+        const costUsd = s.estimated_cost_usd ?? s.cost_usd ?? 0;
         const retried = s.retry_count > 0 ? ' retried' : '';
-        const skillLabel = SKILL_LABELS[s.skill] || s.skill;
+        const skillLabel = SKILL_LABELS[skillKey] || skillKey || '';
         const time = s.elapsed_ms >= 1000 ? `${(s.elapsed_ms / 1000).toFixed(1)}s` : `${s.elapsed_ms}ms`;
-        const llmTime = s.llm_ms >= 1000 ? `${(s.llm_ms / 1000).toFixed(1)}s` : `${s.llm_ms}ms`;
+        const llmTime = llmMs >= 1000 ? `${(llmMs / 1000).toFixed(1)}s` : `${llmMs}ms`;
         const tokens = s.input_tokens || s.output_tokens
           ? `${s.input_tokens}t in · ${s.output_tokens}t out`
           : '--';
-        const cost = s.cost_usd > 0 ? `$${s.cost_usd.toFixed(4)}` : '--';
+        const cost = costUsd > 0 ? `$${costUsd.toFixed(4)}` : '--';
+        // Prefer top-level models_used; fall back to extracting from llm_calls.
+        const modelsList = s.models_used && s.models_used.length
+          ? s.models_used
+          : (s.llm_calls || []).map(c => c.model).filter(Boolean);
+        const models = formatModelsUsed(modelsList);
 
         html += `
           <tr class="${retried}">
             <td>${escapeHtml(skillLabel)}</td>
             <td>${time}</td>
             <td class="benchmark-muted">${llmTime}</td>
+            <td class="benchmark-muted">${escapeHtml(models)}</td>
             <td class="benchmark-muted">${tokens}</td>
             <td class="benchmark-cost">${cost}</td>
           </tr>
@@ -2227,32 +2410,32 @@ Add due_date field to the Task model"
       });
 
       // User wait row (if clarification happened)
-      const clarifierSkill = event.skills.find(s => s.skill === 'clarifier');
-      if (clarifierSkill && clarifierSkill.elapsed_ms > clarifierSkill.llm_ms + 1000) {
-        const userWait = clarifierSkill.elapsed_ms - clarifierSkill.llm_ms - (clarifierSkill.non_llm_ms || 0);
-        if (userWait > 500) {
-          const waitTime = userWait >= 1000 ? `${(userWait / 1000).toFixed(1)}s` : `${userWait}ms`;
-          html += `
-            <tr class="user-wait">
-              <td>&nbsp;&nbsp;→ user response</td>
-              <td>${waitTime}</td>
-              <td>--</td>
-              <td>--</td>
-              <td>--</td>
-            </tr>
-          `;
-        }
+      const userWaitMs = event.user_wait_ms ?? 0;
+      if (userWaitMs > 500) {
+        const waitTime = userWaitMs >= 1000 ? `${(userWaitMs / 1000).toFixed(1)}s` : `${userWaitMs}ms`;
+        html += `
+          <tr class="user-wait">
+            <td>&nbsp;&nbsp;→ user response (excluded from total)</td>
+            <td>${waitTime}</td>
+            <td>--</td>
+            <td>--</td>
+            <td>--</td>
+            <td>--</td>
+          </tr>
+        `;
       }
 
-      // Total row
-      const totalTime = event.total_elapsed_human || formatElapsed(event.total_elapsed_ms);
+      // Total row — agent-only time (user wait is shown above, not summed here)
+      const totalMs = event.total_agent_ms ?? event.total_elapsed_ms;
+      const totalTime = event.total_elapsed_human || formatElapsed(totalMs);
       const totalCost = event.total_cost_usd > 0 ? `$${event.total_cost_usd.toFixed(4)}` : '--';
       const totalTokens = `${event.total_input_tokens}t in · ${event.total_output_tokens}t out`;
 
       html += `
           <tr class="total-row">
-            <td>Total</td>
+            <td>Total (agent only)</td>
             <td>${totalTime}</td>
+            <td></td>
             <td></td>
             <td class="benchmark-muted">${totalTokens}</td>
             <td class="benchmark-cost">${totalCost}</td>

@@ -1271,10 +1271,19 @@ Add due_date field to the Task model"
   <!-- Footer -->
   <footer class="footer">
     Feature Agent · Built with Claude API · Course by Adnan Khan
+    · <span id="app-version" title="Bump this on UI changes to verify cache freshness"></span>
   </footer>
 
   <script src="mock-data.js"></script>
   <script>
+    // ─── Version ─────────────────────────────────────
+    // Bump this on every meaningful UI change so users can verify they're
+    // not viewing a stale cached version. Format: YYYY-MM-DD.N
+    const APP_VERSION = '2026-04-19.1';
+    console.log('[script] app version:', APP_VERSION);
+    const versionEl = document.getElementById('app-version');
+    if (versionEl) versionEl.textContent = `v${APP_VERSION}`;
+
     // ─── Configuration ───────────────────────────────
     const CONFIG = {
       API_URL: 'http://localhost:8000',
@@ -2062,6 +2071,21 @@ Add due_date field to the Task model"
     const statPills = document.getElementById('stat-pills');
     let lastBenchmarkEvent = null;
 
+    function formatModelName(modelId) {
+      if (!modelId) return '';
+      if (modelId.includes('opus-4-7')) return 'Opus 4.7';
+      if (modelId.includes('opus-4-6')) return 'Opus 4.6';
+      if (modelId.includes('sonnet-4-6')) return 'Sonnet 4.6';
+      if (modelId.includes('sonnet-4-5')) return 'Sonnet 4.5';
+      if (modelId.includes('haiku-4-5')) return 'Haiku 4.5';
+      return modelId;
+    }
+
+    function formatModelsUsed(modelsUsed) {
+      if (!modelsUsed || modelsUsed.length === 0) return '--';
+      return [...new Set(modelsUsed.map(formatModelName))].join(', ');
+    }
+
     function renderBenchmarkTable(event) {
       benchmarkSection.style.display = 'block';
 
@@ -2071,6 +2095,7 @@ Add due_date field to the Task model"
             <th>Skill</th>
             <th>Time</th>
             <th>LLM</th>
+            <th>Model</th>
             <th>Tokens</th>
             <th>Cost</th>
           </tr>
@@ -2087,12 +2112,17 @@ Add due_date field to the Task model"
           ? `${s.input_tokens}t in · ${s.output_tokens}t out`
           : '--';
         const cost = s.cost_usd > 0 ? `$${s.cost_usd.toFixed(4)}` : '--';
+        const modelsList = s.models_used && s.models_used.length
+          ? s.models_used
+          : (s.llm_calls || []).map(c => c.model).filter(Boolean);
+        const models = formatModelsUsed(modelsList);
 
         html += `
           <tr class="${retried}">
             <td>${escapeHtml(skillLabel)}</td>
             <td>${time}</td>
             <td class="benchmark-muted">${llmTime}</td>
+            <td class="benchmark-muted">${escapeHtml(models)}</td>
             <td class="benchmark-muted">${tokens}</td>
             <td class="benchmark-cost">${cost}</td>
           </tr>
@@ -2112,6 +2142,7 @@ Add due_date field to the Task model"
               <td>--</td>
               <td>--</td>
               <td>--</td>
+              <td>--</td>
             </tr>
           `;
         }
@@ -2124,8 +2155,9 @@ Add due_date field to the Task model"
 
       html += `
           <tr class="total-row">
-            <td>Total</td>
+            <td>Total (agent only)</td>
             <td>${totalTime}</td>
+            <td></td>
             <td></td>
             <td class="benchmark-muted">${totalTokens}</td>
             <td class="benchmark-cost">${totalCost}</td>
